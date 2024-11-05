@@ -232,25 +232,27 @@ Longitud Máxima de Caracteres: {encabezado.longitudMaxima}
 """
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo-0125",  # Puedes usar el modelo que prefieras
             messages=[{"role": "user", "content": prompt}],
             max_tokens=300,
             temperature=0.7,
         )
-        encabezados_generados = response.choices[0].message.content.strip()
+        resultado = response.choices[0].message.content.strip()
+        print("Respuesta del modelo:", resultado)  # Para depuración
 
-        # Usar expresiones regulares para eliminar numeración o formato adicional
-        variantes = re.findall(r"^\d+\.?\s*(.*)$", encabezados_generados, re.MULTILINE)
-
-        # Si no se encontró ningún encabezado numerado, dividir por líneas como respaldo
-        if not variantes:
-            variantes = [line.strip() for line in encabezados_generados.split('\n') if line.strip() != '']
-
-        # Limitar el número de variantes según lo especificado
-        variantes = variantes[:encabezado.variantes]
-
-        return {
-            "encabezados": variantes
-        }
+        # Intentar extraer el JSON de la respuesta
+        import re
+        match = re.search(r'\{.*\}', resultado, re.DOTALL)
+        if match:
+            json_str = match.group()
+            encabezados_data = json.loads(json_str)
+            encabezados = encabezados_data.get("encabezados", [])
+            return {
+                "encabezados": encabezados[:encabezado.variantes]  # Limitar a las variantes especificadas
+            }
+        else:
+            raise HTTPException(status_code=500, detail=f"No se pudo encontrar un JSON válido en la respuesta.\nRespuesta del modelo:\n{resultado}")
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Error al parsear JSON: {e.msg}\nRespuesta del modelo:\n{resultado}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}\nRespuesta del modelo:\n{resultado}")
