@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import os
+import re
 from openai import OpenAI
 from dotenv import load_dotenv
 from .models import CampanaDetallesInput, PublicoObjetivoUbicacionesInput, FormatoCTAInput, ContenidoCreativoInput, EncabezadoAnuncio
@@ -238,11 +239,18 @@ Longitud Máxima de Caracteres: {encabezado.longitudMaxima}
         )
         encabezados_generados = response.choices[0].message.content.strip()
 
-        # Separar las variantes generadas por saltos de línea dobles o líneas numeradas
-        variantes = [line.strip() for line in encabezados_generados.split('\n') if line.strip() != '']
+        # Usar expresiones regulares para eliminar numeración o formato adicional
+        variantes = re.findall(r"^\d+\.?\s*(.*)$", encabezados_generados, re.MULTILINE)
+
+        # Si no se encontró ningún encabezado numerado, dividir por líneas como respaldo
+        if not variantes:
+            variantes = [line.strip() for line in encabezados_generados.split('\n') if line.strip() != '']
+
+        # Limitar el número de variantes según lo especificado
+        variantes = variantes[:encabezado.variantes]
 
         return {
-            "encabezados": variantes[:encabezado.variantes]  # Limitar a las variantes especificadas
+            "encabezados": variantes
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

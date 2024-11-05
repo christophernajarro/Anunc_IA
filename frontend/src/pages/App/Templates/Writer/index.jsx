@@ -45,7 +45,12 @@ function Writer() {
                 longitudMaxima,
                 variantes
             });
-            setResultado(response.data.encabezados.join("<br><br>")); // Mostrar las variantes separadas por salto de línea
+            if (Array.isArray(response.data.encabezados)) {
+                setResultado(response.data.encabezados); // Asigna el array directamente a resultado
+            } else {
+                console.error("El formato de los datos no es el esperado.");
+                setResultado([]); // Si no es un array, no actualices el estado
+            }
         } catch (error) {
             console.error("Error al generar el encabezado:", error);
             setResultado("Ocurrió un error al generar el encabezado.");
@@ -161,8 +166,15 @@ function Writer() {
                             <div className="w-full lg:w-3/5">
                                 {resultado ? 
                                 <SimpleBar className="p-6 h-full">
-                                    <div className="prosa dark:prose-invert">
-                                        {parse(resultado)}
+                                    <div className="flex flex-wrap gap-4">
+                                        {resultado.map((encabezado, index) => (
+                                            <button
+                                                key={index}
+                                                className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 px-6 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:from-blue-600 hover:to-indigo-700"
+                                            >
+                                                {encabezado}
+                                            </button>
+                                        ))}
                                     </div>
                                 </SimpleBar>
                                 : 
