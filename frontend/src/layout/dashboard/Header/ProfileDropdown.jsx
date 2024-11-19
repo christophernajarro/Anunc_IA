@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Menu, Transition } from "@headlessui/react";
 import { usePopper } from "react-popper";
-import { NavLink, useNavigate } from "react-router-dom"; // Importa useNavigate
+import { NavLink, useNavigate } from "react-router-dom";
 import {
     CubeIcon,
     PowerIcon,
@@ -11,7 +11,7 @@ import {
 function ProfileDropdown() {
     const [referenceElement, setReferenceElement] = useState(null);
     const [popperElement, setPopperElement] = useState(null);
-    const navigate = useNavigate(); // Inicializa useNavigate
+    const navigate = useNavigate();
     let { styles, attributes } = usePopper(referenceElement, popperElement, {
         placement: "bottom-end",
         modifiers: [
@@ -25,9 +25,17 @@ function ProfileDropdown() {
     });
 
     // Función para manejar el cierre de sesión
-    const handleLogout = () => {
-        localStorage.removeItem("accessToken"); // Elimina el token
-        navigate("/login"); // Redirige al usuario a /login
+    const handleLogout = async () => {
+        try {
+            await fetch("http://localhost:8000/auth/logout", {
+                method: "POST",
+                credentials: 'include', // Asegura que las cookies se envían en la solicitud
+            });
+            // Redirige al usuario a /login
+            navigate("/login");
+        } catch (error) {
+            console.error("Error al cerrar sesión:", error);
+        }
     };
 
     return (
@@ -86,7 +94,7 @@ function ProfileDropdown() {
                         </li>
                         <li>
                             <button
-                                onClick={handleLogout} // Ejecuta handleLogout al hacer clic
+                                onClick={handleLogout}
                                 className="flex text-xs w-full px-4 py-2 font-bold text-slate-500 dark:text-slate-200 hover:text-blue-600 hover:dark:text-blue-600 transition-all"
                             >
                                 <PowerIcon className="w-4 me-2" />

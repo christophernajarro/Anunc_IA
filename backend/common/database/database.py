@@ -1,11 +1,15 @@
 import os
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker
-from dotenv import load_dotenv  # Asegúrate de cargar dotenv
+import os
 
-# Cargar las variables de entorno desde el archivo .env
-load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../../.env'))
+
+# Intentar cargar las variables de entorno desde .env solo si existe
+dotenv_path = os.path.join(os.path.dirname(__file__), '../../.env')
+if os.path.exists(dotenv_path):
+    from dotenv import load_dotenv
+    load_dotenv(dotenv_path=dotenv_path)
 
 # Obtener la URL de la base de datos
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -14,21 +18,29 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 if DATABASE_URL is None:
     raise ValueError("DATABASE_URL no está definida. Asegúrate de tener un archivo .env correctamente configurado.")
 
-# Configuración de la base de datos con parámetros adicionales para conexiones remotas
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=10,              # Tamaño del pool de conexiones
-    max_overflow=20,           # Conexiones adicionales que se pueden abrir si el pool está lleno
-    pool_timeout=30,           # Tiempo de espera máximo para obtener una conexión
-    pool_recycle=1800,         # Tiempo de reciclaje de conexiones (en segundos)
-    pool_pre_ping=True         # Verifica la conexión antes de usarla
-)
+
+# Verificar si estamos usando SQLite
+if 'sqlite' in DATABASE_URL:
+    # Configuración para SQLite
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False}
+    )
+else:
+    # Configuración para otros motores de base de datos (por ejemplo, PostgreSQL)
+    engine = create_engine(
+        DATABASE_URL,
+        pool_size=20,              # Tamaño del pool de conexiones
+        max_overflow=10,           # Conexiones adicionales que se pueden abrir si el pool está lleno
+        pool_timeout=30,           # Tiempo de espera máximo para obtener una conexión
+        pool_recycle=1800,         # Tiempo de reciclaje de conexiones (en segundos)
+        pool_pre_ping=True         # Verifica la conexión antes de usarla
+    )
+
 
 # Crear la sesión de SQLAlchemy
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
-
-print(f"DATABASE_URL: {DATABASE_URL}")
 
 # Dependencia para obtener la sesión de la base de datos
 def get_db():
@@ -37,3 +49,5 @@ def get_db():
         yield db
     finally:
         db.close()
+
+

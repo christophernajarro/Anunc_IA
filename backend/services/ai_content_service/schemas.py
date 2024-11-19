@@ -1,7 +1,6 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from pydantic import BaseModel, Field
 from datetime import datetime
-from common.database.database import Base
-from pydantic import BaseModel
+from typing import List
 
 class ObjetivoCampanaInput(BaseModel):
     nombreProducto: str
@@ -18,7 +17,6 @@ class PublicoObjetivoUbicacionesInput(BaseModel):
     distrito: str
     provincia: str
     departamento: str
-    ubicacionesMeta: str  # Lista de ubicaciones de anuncios predefinidas de Meta
 
 class FormatoCTAInput(BaseModel):
     nombreProducto: str
@@ -33,13 +31,27 @@ class ContenidoCreativoInput(BaseModel):
 class EncabezadoAnuncio(BaseModel):
     nombreProducto: str
     descripcionProducto: str
-    palabrasClave: str
+    palabrasClave: List[str]  # Cambiado a List[str]
     estiloEscritura: str
     longitudMaxima: int
-    variantes: int = 3  # Número de variantes a generar
+    variantes: int  # Número de variantes a generar
 
 class CampanaDetallesInput(BaseModel):
     nombreProducto: str
     descripcionProducto: str
     tipoCampana: str  # Por ejemplo: Pequeña, Mediana, Grande
     duracionPreferida: str  # Por ejemplo: Corta, Mediana, Larga
+
+class DocumentoCreate(BaseModel):
+    tipo_documento: str = Field(..., example="Artículo")
+    contenido: str = Field(..., example="Contenido del documento...")
+
+class DocumentoResponse(BaseModel):
+    id_documento: int
+    tipo_documento: str
+    contenido: str
+    fecha_creacion: datetime
+    id_usuario: int
+
+    class Config:
+        from_attributes = True

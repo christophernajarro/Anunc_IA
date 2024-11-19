@@ -8,7 +8,9 @@ import { Input, Label, Select, Textarea } from "../../../../components";
 
 import { templates } from "../../../../store";
 import { NavLink, useParams } from "react-router-dom";
-import axios from "axios";  // Asegúrate de tener axios instalado para las solicitudes HTTP
+import axios from "axios";
+import ReactQuill from "react-quill";
+import 'react-quill/dist/quill.snow.css';
 
 const tonos = [
     { name: "Profesional" },
@@ -31,30 +33,74 @@ function Writer() {
     const [longitudMaxima, setLongitudMaxima] = useState(200);
     const [variantes, setVariantes] = useState(3);
     const [resultado, setResultado] = useState('');
-    
+    const [contenidoEditable, setContenidoEditable] = useState('');
+
     const { writerslug } = useParams();
     const plantilla = templates.filter((template) => template.slug === writerslug)[0];
 
     const generarEncabezado = async () => {
         try {
-            const response = await axios.post("http://localhost:8000/content/create_heading", {
-                nombreProducto,
-                descripcionProducto,
-                palabrasClave,
-                estiloEscritura: tonoSeleccionado.name,
-                longitudMaxima,
-                variantes
-            });
-            if (Array.isArray(response.data.encabezados)) {
-                setResultado(response.data.encabezados); // Asigna el array directamente a resultado
+            const token = localStorage.getItem("accessToken");
+
+            if (!token) {
+                setResultado("Error: No estás autenticado. Por favor, inicia sesión.");
+                return;
+            }
+
+            const response = await axios.post(
+                "http://localhost:8000/content/create_heading",
+                {
+                    nombreProducto,
+                    descripcionProducto,
+                    palabrasClave: palabrasClave.split(",").map((word) => word.trim()),
+                    estiloEscritura: tonoSeleccionado.name,
+                    longitudMaxima,
+                    variantes
+                },
+                {
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            if (response.data && response.data.encabezados) {
+                const encabezadosGenerados = `<ol>${response.data.encabezados.map(header => `<li>${header}</li>`).join("")}</ol>`;
+                setResultado(encabezadosGenerados);
+                setContenidoEditable(encabezadosGenerados);
             } else {
-                console.error("El formato de los datos no es el esperado.");
-                setResultado([]); // Si no es un array, no actualices el estado
+                setResultado("No se recibieron datos válidos desde el servidor.");
             }
         } catch (error) {
+            if (error.response) {
+                if (error.response.status === 401) {
+                    setResultado("Error de autenticación: tu sesión ha expirado o no tienes permisos. Inicia sesión nuevamente.");
+                    localStorage.removeItem("accessToken");
+                } else if (error.response.status === 422) {
+                    setResultado("Error de validación: algunos de los datos proporcionados no son correctos.");
+                } else {
+                    setResultado(`Error: ${error.response.data.detail || "Ocurrió un error inesperado en el servidor."}`);
+                }
+            } else if (error.request) {
+                setResultado("No se pudo conectar con el servidor. Verifica tu conexión a internet.");
+            } else {
+                setResultado(`Error inesperado: ${error.message}`);
+            }
             console.error("Error al generar el encabezado:", error);
-            setResultado("Ocurrió un error al generar el encabezado.");
         }
+    };
+
+    const nuevaConsulta = () => {
+        if (window.confirm("¿Estás seguro de que deseas comenzar una nueva consulta? Se perderán los datos actuales.")) {
+            window.location.reload();
+        }
+    };
+
+    const guardarDocumentoEditado = () => {
+        // Aquí puedes agregar la lógica para guardar el documento editado
+        console.log("Documento guardado:", contenidoEditable);
+        alert("Documento guardado exitosamente.");
     };
 
     return (
@@ -62,13 +108,17 @@ function Writer() {
             <Section className="py-10">
                 <Container>
                     <div className="flex flex-wrap gap-8 xl:flex-nowrap items-start">
+                        {/* Sidebar de plantillas */}
                         <div className="w-full xl:w-96 bg-white dark:bg-slate-950 px-7 py-6 rounded-lg border border-slate-200 dark:border-slate-800">
                             <h4 className="text-xl font-bold mb-3 text-slate-700 dark:text-white">Plantillas</h4>
                             <ul className="flex flex-wrap -mx-4 xl:mx-0">
                                 {plantillasDeTexto.map((item, index) => (
                                     <li key={index} className="w-full xs:w-1/2 sm:w-1/3 lg:w-1/4 xl:w-full px-4 xs:py-1 xl:px-0 xl:py-0">
                                         <NavLink
-                                        onClick={ () => setResultado('') }
+                                            onClick={() => {
+                                                setResultado('');
+                                                setContenidoEditable('');
+                                            }}
                                             to={item.link}
                                             className={({ isActive }) =>
                                                 isActive
@@ -87,7 +137,9 @@ function Writer() {
                                 ))}
                             </ul>
                         </div>
+                        {/* Área principal */}
                         <div className="flex flex-wrap lg:flex-nowrap flex-grow-1 w-full bg-white dark:bg-slate-950 rounded-lg border border-slate-200 dark:border-slate-800 xl:max-h-[calc(100vh-theme(space.52))]">
+                            {/* Formulario */}
                             <div className="w-full lg:w-2/5 border-b lg:border-e lg:border-b-0 border-slate-200 dark:border-slate-800">
                                 <SimpleBar className="p-6 h-full">
                                     <div className="flex items-center pb-2">
@@ -155,26 +207,31 @@ function Writer() {
                                                 onChange={(e) => setLongitudMaxima(parseInt(e.target.value))}
                                             />
                                         </div>
-                                        <div className="py-2 px-3">
+                                        <div className="py-2 px-3 flex gap-2">
                                             <button onClick={generarEncabezado} className="inline-flex font-medium text-sm bg-blue-600 text-white hover:bg-blue-800 transition-all px-5 py-2 rounded-full">
                                                 Generar
+                                            </button>
+                                            <button onClick={nuevaConsulta} className="inline-flex font-medium text-sm bg-red-600 text-white hover:bg-red-800 transition-all px-5 py-2 rounded-full">
+                                                Nueva Consulta
                                             </button>
                                         </div>
                                     </div>
                                 </SimpleBar>
                             </div>
-                            <div className="w-full lg:w-3/5">
+                            {/* Área de resultado editable con ReactQuill */}
+                            <div className="w-full lg:w-3/5 flex flex-col">
                                 {resultado ? 
                                 <SimpleBar className="p-6 h-full">
-                                    <div className="flex flex-wrap gap-4">
-                                        {resultado.map((encabezado, index) => (
-                                            <button
-                                                key={index}
-                                                className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-2 px-6 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:from-blue-600 hover:to-indigo-700"
-                                            >
-                                                {encabezado}
-                                            </button>
-                                        ))}
+                                    <div className="flex flex-col h-full">
+                                        <ReactQuill
+                                            className="flex-grow mb-4"
+                                            theme="snow"
+                                            value={contenidoEditable}
+                                            onChange={setContenidoEditable}
+                                        />
+                                        <button onClick={guardarDocumentoEditado} className="self-end inline-flex font-medium text-sm bg-green-600 text-white hover:bg-green-800 transition-all px-5 py-2 rounded-full mt-4">
+                                            Guardar documento editado
+                                        </button>
                                     </div>
                                 </SimpleBar>
                                 : 

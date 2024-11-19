@@ -11,4 +11,5 @@ RUN npm ci
 
 COPY . .
 
+# Comando para iniciar la aplicación frontend
 CMD ["npm", "run", "dev"]

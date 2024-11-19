@@ -16,38 +16,35 @@ function CreateAccount() {
     const navigate = useNavigate();
 
     const handleRegister = async (e) => {
-        e.preventDefault();
+    e.preventDefault();
 
-        // Verifica que las contraseñas coincidan
-        if (password !== confirmPassword) {
-            setErrorMessage("Las contraseñas no coinciden");
-            return;
+    if (password !== confirmPassword) {
+        setErrorMessage("Las contraseñas no coinciden");
+        return;
+    }
+
+    try {
+        const response = await fetch("http://localhost:8000/auth/register", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ nombre, email, password }),
+        });
+
+        if (!response.ok) {
+            throw new Error("Error en el registro");
         }
 
-        try {
-            const response = await fetch("http://localhost:8000/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ nombre, email, password }),
-            });
+        const data = await response.json();
+        localStorage.setItem("accessToken", data.access_token);
+        navigate("/dashboard");
+    } catch (error) {
+        setErrorMessage("Error en el registro, verifique los datos");
+        console.error("Error:", error);
+    }
+};
 
-            if (!response.ok) {
-                throw new Error("Error en el registro");
-            }
-
-            const data = await response.json();
-            console.log("Registro exitoso:", data);
-
-            // Guarda el token en localStorage y redirige
-            localStorage.setItem("accessToken", data.access_token);
-            navigate("/dashboard");
-        } catch (error) {
-            setErrorMessage("Error en el registro, verifique los datos");
-            console.error("Error:", error);
-        }
-    };
 
     return (
         <Layout title="Crear Cuenta">

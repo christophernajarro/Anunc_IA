@@ -3,11 +3,16 @@ name: Deploy AnuncIA to AWS
 on:
   push:
     branches:
-      - main 
+      - main
 
 jobs:
   deploy_backend:
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis
+        ports:
+          - 6379:6379
 
     steps:
     - name: Checkout code
@@ -21,31 +26,35 @@ jobs:
     - name: Set PYTHONPATH
       run: echo "PYTHONPATH=$PYTHONPATH:$(pwd):$(pwd)/backend" >> $GITHUB_ENV
 
-    # Configura DATABASE_URL como una variable de entorno usando el secreto de GitHub
-    - name: Set DATABASE_URL
-      run: echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+    # Configura variables de entorno usando los secretos de GitHub
+    - name: Set environment variables
+      run: |
+        echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+        echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
 
-    # Configura SECRET_KEY como una variable de entorno usando el secreto de GitHub
-    - name: Set SECRET_KEY
-      run: echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
-
-    # Configura OPENAI_API_KEY como una variable de entorno usando el secreto de GitHub
-    - name: Set OPENAI_API_KEY
-      run: echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
-
-    - name: Install backend dependencies
+    - name: Install dependencies
       run: |
         pip install -r backend/requirements.txt
-        pip install pytest coverage  # Instala pytest y coverage para las pruebas y cobertura de código
+        pip install pytest coverage pytest-asyncio anyio httpx alembic
 
-    - name: Clear coverage cache
-      run: rm -f .coverage 
+    # Aplica las migraciones sin `cd backend` para evitar duplicar la ruta
+    - name: Apply Alembic migrations
+      working-directory: ./backend  # Configura el directorio de trabajo
+      env:
+        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      run: |
+        alembic upgrade head
 
     - name: Run tests with coverage
+      env:
+        REDIS_URL: redis://localhost:6379
+        DATABASE_URL: "sqlite:///:memory:"
       run: |
-        coverage run -m pytest tests  # Ejecuta pytest y calcula la cobertura
-        coverage report  # Muestra el reporte de cobertura en la consola
-        coverage xml -o coverage.xml  # Genera un archivo coverage.xml para integraciones externas
+        coverage run --rcfile=.coveragerc -m pytest tests
+        coverage report
+        coverage xml -o coverage.xml
+      continue-on-error: false
 
     - name: Zip backend code
       run: zip -r backend.zip backend/ main.py requirements.txt
@@ -80,23 +89,19 @@ jobs:
         cd frontend
         npm install
 
-    # Verificación de despliegue en modo desarrollo
+    # Skip deployment in development mode
     - name: Skip deployment in development mode
-      run: |
-        if [ "$CI" = "true" ]; then
-          echo "Skipping build and deployment. Frontend is still in development mode."
-        else
-          echo "Development build, skipping deployment."
-        fi
+      if: ${{ github.event_name == 'push' }}
+      run: echo "Development build, skipping deployment."
 
     - name: Build frontend (only for production)
-      if: ${{ github.event_name != 'push' }}  # Solo construye si NO estás en desarrollo
+      if: ${{ github.event_name != 'push' }}
       run: |
         cd frontend
         npm run build
 
     - name: Deploy to S3 (only if build exists)
-      if: ${{ github.event_name != 'push' }}  # Solo despliega si NO estás en desarrollo
+      if: ${{ github.event_name != 'push' }}
       run: |
         if [ -d "frontend/build" ]; then
           aws s3 sync frontend/build/ s3://anunc-ia-frontend --delete

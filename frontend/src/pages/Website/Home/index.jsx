@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 
 function IntroPage() {
     return (
-        <Layout title="Anunc IA">
+        <Layout>
             <Section className="py-24 bg-gradient-to-br from-white dark:from-slate-950 to-blue-100 dark:to-blue-950 overflow-hidden">
                 <Container>
                     <div className="max-w-3xl mx-auto text-center">

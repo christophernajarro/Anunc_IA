@@ -24,26 +24,29 @@ function LoginPage() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-
+    
         try {
             const response = await fetch("http://localhost:8000/auth/login", {
                 method: "POST",
                 headers: {
-                    "Content-Type": "application/json",
+                    "Content-Type": "application/x-www-form-urlencoded",
                 },
-                body: JSON.stringify({ email, password }),
+                body: new URLSearchParams({
+                    username: email,
+                    password: password,
+                }),
             });
-
+    
             if (!response.ok) {
                 throw new Error("Error en el inicio de sesión");
             }
-
+    
             const data = await response.json();
             console.log("Inicio de sesión exitoso:", data);
-
+    
             // Guardar el token en localStorage
             localStorage.setItem("accessToken", data.access_token);
-
+    
             // Redirigir a /dashboard
             navigate("/dashboard");
         } catch (error) {
