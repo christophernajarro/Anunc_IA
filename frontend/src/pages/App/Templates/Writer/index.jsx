@@ -5,7 +5,7 @@ import Section from "../../../../layout/global/Section";
 import Container from "../../../../layout/global/Container";
 import { Input, Label, Select, Textarea } from "../../../../components";
 import { templates } from "../../../../store";
-import { NavLink, useParams } from "react-router-dom";
+import { NavLink, useParams, useNavigate, useLocation } from "react-router-dom"; //agregar useNavigate
 import axiosInstance from "../../../../api/api";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
@@ -59,6 +59,29 @@ function Writer() {
             setFields(initialFields);
             setResultado("");
             setContenidoEditable("");
+        }
+    };
+
+    //Secuencialidad de pasos
+    const navigate = useNavigate(); //agregar useNavigate
+    const location = useLocation();
+
+    const steps = [
+        "/template/define-campaign",
+        "/template/define-audience",
+        "/template/choose-format-cta",
+        "/template/create-creative-content",
+        "/template/create-heading",
+    ];
+
+    const currentStepIndex = steps.indexOf(location.pathname);
+
+    const avanzarPaso = () => {
+        if (currentStepIndex < steps.length - 1) {
+            navigate(steps[currentStepIndex + 1]); // Avanza al siguiente paso
+        } else {
+            alert("Todos los pasos han sido completados.");
+            navigate("/documents"); // Redirige a /documents al completar todos los pasos
         }
     };
 
@@ -180,7 +203,7 @@ function Writer() {
                                                 onChange={setContenidoEditable}
                                             />
                                             <button
-                                                onClick={guardarDocumentoEditado}
+                                                onClick={() => { guardarDocumentoEditado(); avanzarPaso(); }}
                                                 className="self-end inline-flex font-medium text-sm bg-green-600 text-white hover:bg-green-800 transition-all px-5 py-2 rounded-full mt-4"
                                             >
                                                 Guardar documento editado
