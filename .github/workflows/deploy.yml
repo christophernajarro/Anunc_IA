@@ -6,89 +6,219 @@ on:
       - main
 
 jobs:
+  build_layer_main:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install main dependencies
+        run: |
+          mkdir -p python_main
+          pip install --no-cache-dir -r backend/requirements_main.txt -t python_main/
+          # Eliminar archivos innecesarios dentro de las dependencias
+          find python_main/ -name "*.pyc" -delete
+          find python_main/ -type d -name "__pycache__" -exec rm -r {} +
+          find python_main/ -type d -name "tests" -exec rm -r {} +
+          find python_main/ -type d -name "test" -exec rm -r {} +
+
+      - name: Analyze main layer size
+        run: |
+          du -h --max-depth=1 python_main/ | sort -hr
+
+      - name: Package main layer
+        run: zip -r dependencies_layer_main.zip python_main/
+
+      - name: Analyze main layer zip size
+        run: |
+          LAYER_SIZE=$(du -b dependencies_layer_main.zip | cut -f1)
+          echo "Main layer package size: $LAYER_SIZE bytes"
+          if [ $LAYER_SIZE -gt 52428800 ]; then
+            echo "Main layer package size exceeds 50 MB limit."
+            exit 1
+          fi
+
+      - name: Publish main layer
+        run: |
+          aws lambda publish-layer-version \
+            --layer-name anunc-ia-dependencies-main \
+            --zip-file fileb://dependencies_layer_main.zip \
+            --compatible-runtimes python3.10
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
+
+  build_layer_secondary:
+    runs-on: ubuntu-latest
+    needs: build_layer_main
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
+
+      - name: Install secondary dependencies
+        run: |
+          mkdir -p python_secondary
+          pip install --no-cache-dir -r backend/requirements_secondary.txt -t python_secondary/
+          # Eliminar archivos innecesarios dentro de las dependencias
+          find python_secondary/ -name "*.pyc" -delete
+          find python_secondary/ -type d -name "__pycache__" -exec rm -r {} +
+          find python_secondary/ -type d -name "tests" -exec rm -r {} +
+          find python_secondary/ -type d -name "test" -exec rm -r {} +
+
+      - name: Analyze secondary layer size
+        run: |
+          du -h --max-depth=1 python_secondary/ | sort -hr
+
+      - name: Package secondary layer
+        run: zip -r dependencies_layer_secondary.zip python_secondary/
+
+      - name: Analyze secondary layer zip size
+        run: |
+          LAYER_SIZE=$(du -b dependencies_layer_secondary.zip | cut -f1)
+          echo "Secondary layer package size: $LAYER_SIZE bytes"
+          if [ $LAYER_SIZE -gt 52428800 ]; then
+            echo "Secondary layer package size exceeds 50 MB limit."
+            exit 1
+          fi
+
+      - name: Publish secondary layer
+        run: |
+          aws lambda publish-layer-version \
+            --layer-name anunc-ia-dependencies-secondary \
+            --zip-file fileb://dependencies_layer_secondary.zip \
+            --compatible-runtimes python3.10
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
+
   deploy_backend:
     runs-on: ubuntu-latest
-
+    needs: [build_layer_main, build_layer_secondary]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.10'
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
 
-    - name: Install dependencies and package code
-      working-directory: ./backend
-      run: |
-        rm -rf build
-        mkdir -p build
-        python -m pip install --upgrade pip
-        pip install --no-cache-dir -r requirements.txt -t build
+      - name: Install application dependencies
+        run: |
+          mkdir -p build
+          pip install --no-cache-dir -r backend/requirements_app.txt -t build/
+          # Desinstalar dependencias que ya están en las capas
+          pip uninstall -y -r backend/requirements_main.txt || true
+          pip uninstall -y -r backend/requirements_secondary.txt || true
 
-        pip unistall -y pycountry || true
-        pip unistall -y ddtrace || true
-        
-        rsync -av --exclude='tests' --exclude='*.pyc' --exclude='__pycache__' --exclude='*.log' --exclude='.git' . build/
-        
-        cd build
-        zip -r9 ../backend.zip . -x "*.pyc" -x "__pycache__/*" -x "*.log"
-        cd ..
-        ZIP_SIZE=$(du -b backend.zip | cut -f1)
-        echo "Backend package size: $ZIP_SIZE bytes"
-        if [ $ZIP_SIZE -gt 52428800 ]; then
-          echo "Backend package size exceeds 50 MB limit."
-          exit 1
-        fi
-        aws lambda update-function-code \
-          --function-name anunc-ia-backend \
-          --zip-file fileb://backend.zip
+      - name: Synchronize application code
+        run: |
+          rsync -av \
+            --exclude='tests' \
+            --exclude='*.pyc' \
+            --exclude='__pycache__' \
+            --exclude='*.log' \
+            --exclude='.git' \
+            --exclude='docs' \
+            --exclude='*.md' \
+            --exclude='requirements_app.txt' \
+            . build/
+
+      - name: Package application code
+        run: |
+          cd build
+          zip -r9 ../backend.zip . -x "*.pyc" -x "__pycache__/*" -x "*.log" -x "docs/*" -x "*.md"
+          cd ..
+          ZIP_SIZE=$(du -b backend.zip | cut -f1)
+          echo "Backend package size: $ZIP_SIZE bytes"
+          if [ $ZIP_SIZE -gt 52428800 ]; then
+            echo "Backend package size exceeds 50 MB limit."
+            exit 1
+          fi
+
+      - name: Upload code to Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name anunc-ia-backend \
+            --zip-file fileb://backend.zip
+
+      - name: Associate main layer to Lambda function
+        run: |
+          LAYER_MAIN_ARN=$(aws lambda list-layer-versions --layer-name anunc-ia-dependencies-main --query 'LayerVersions[-1].LayerVersionArn' --output text)
+          aws lambda update-function-configuration \
+            --function-name anunc-ia-backend \
+            --layers $LAYER_MAIN_ARN
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
+
+      - name: Associate secondary layer to Lambda function
+        run: |
+          LAYER_SECONDARY_ARN=$(aws lambda list-layer-versions --layer-name anunc-ia-dependencies-secondary --query 'LayerVersions[-1].LayerVersionArn' --output text)
+          aws lambda update-function-configuration \
+            --function-name anunc-ia-backend \
+            --layers $LAYER_MAIN_ARN $LAYER_SECONDARY_ARN
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-2
 
   deploy_frontend_after_backend:
     runs-on: ubuntu-latest
     needs: deploy_backend
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '18'
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
 
-    - name: Install frontend dependencies
-      run: |
-        cd frontend
-        npm install
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm install
 
-    - name: Build frontend
-      run: |
-        cd frontend
-        npm run build
-    
-    - name: Verify dist directory exists
-      run: |
-        if [ ! -d "frontend/dist" ]; then
-          echo "Error: Dist directory not found. Exiting."
-          exit 1
-        fi
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-2
+      - name: Verify dist directory exists
+        run: |
+          if [ ! -d "frontend/dist" ]; then
+            echo "Error: Dist directory not found. Exiting."
+            exit 1
+          fi
 
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
 
-    - name: Deploy frontend to S3
-      run: |
-        aws s3 sync frontend/dist/ s3://anunc-ia-frontend --delete
+      - name: Deploy frontend to S3
+        run: |
+          aws s3 sync frontend/dist/ s3://anunc-ia-frontend --delete
