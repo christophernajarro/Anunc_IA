@@ -6,160 +6,89 @@ on:
       - main
 
 jobs:
-  build_layer:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies for layer
-        run: |
-          mkdir -p python
-          pip install --no-cache-dir -r backend/requirements.txt -t python/
-          # Eliminar archivos innecesarios dentro de las dependencias
-          find python/ -name "*.pyc" -delete
-          find python/ -type d -name "__pycache__" -exec rm -r {} +
-          find python/ -type d -name "tests" -exec rm -r {} +
-          find python/ -type d -name "test" -exec rm -r {} +
-
-      - name: Analyze dependencies size
-        run: |
-          du -h --max-depth=1 python/ | sort -hr
-
-      - name: Package layer
-        run: zip -r dependencies_layer.zip python/
-
-      - name: Analyze layer size
-        run: |
-          LAYER_SIZE=$(du -b dependencies_layer.zip | cut -f1)
-          echo "Layer package size: $LAYER_SIZE bytes"
-          if [ $LAYER_SIZE -gt 52428800 ]; then
-            echo "Layer package size exceeds 50 MB limit."
-            exit 1
-          fi
-
-      - name: Publish layer
-        run: |
-          aws lambda publish-layer-version \
-            --layer-name anunc-ia-dependencies \
-            --zip-file fileb://dependencies_layer.zip \
-            --compatible-runtimes python3.10
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-2
-
   deploy_backend:
     runs-on: ubuntu-latest
-    needs: build_layer
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10'
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2
 
-      - name: Install dependencies for code (solo desarrollo)
-        run: |
-          mkdir -p build
-          pip install --no-cache-dir -r backend/requirements.txt -t build/
-          # Desinstalar dependencias que ya están en la capa
-          pip uninstall -y -r backend/requirements.txt || true
+    - name: Install dependencies and package code
+      working-directory: ./backend
+      run: |
+        rm -rf build
+        mkdir -p build
+        python -m pip install --upgrade pip
+        pip install --no-cache-dir -r requirements.txt -t build
 
-      - name: Synchronize code excluding dependencies
-        run: |
-          rsync -av \
-            --exclude='tests' \
-            --exclude='*.pyc' \
-            --exclude='__pycache__' \
-            --exclude='*.log' \
-            --exclude='.git' \
-            --exclude='docs' \
-            --exclude='*.md' \
-            --exclude='requirements.txt' \
-            . build/
-
-      - name: Package code
-        run: |
-          cd build
-          zip -r9 ../backend.zip . -x "*.pyc" -x "__pycache__/*" -x "*.log" -x "docs/*" -x "*.md"
-          cd ..
-          ZIP_SIZE=$(du -b backend.zip | cut -f1)
-          echo "Backend package size: $ZIP_SIZE bytes"
-          if [ $ZIP_SIZE -gt 52428800 ]; then
-            echo "Backend package size exceeds 50 MB limit."
-            exit 1
-          fi
-
-      - name: Upload code to Lambda
-        run: |
-          aws lambda update-function-code \
-            --function-name anunc-ia-backend \
-            --zip-file fileb://backend.zip
-
-      - name: Associate layer to Lambda function
-        run: |
-          LAYER_ARN=$(aws lambda list-layer-versions --layer-name anunc-ia-dependencies --query 'LayerVersions[-1].LayerVersionArn' --output text)
-          aws lambda update-function-configuration \
-            --function-name anunc-ia-backend \
-            --layers $LAYER_ARN
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-2
+        pip unistall -y pycountry || true
+        pip unistall -y ddtrace || true
+        
+        rsync -av --exclude='tests' --exclude='*.pyc' --exclude='__pycache__' --exclude='*.log' --exclude='.git' . build/
+        
+        cd build
+        zip -r9 ../backend.zip . -x "*.pyc" -x "__pycache__/*" -x "*.log"
+        cd ..
+        ZIP_SIZE=$(du -b backend.zip | cut -f1)
+        echo "Backend package size: $ZIP_SIZE bytes"
+        if [ $ZIP_SIZE -gt 52428800 ]; then
+          echo "Backend package size exceeds 50 MB limit."
+          exit 1
+        fi
+        aws lambda update-function-code \
+          --function-name anunc-ia-backend \
+          --zip-file fileb://backend.zip
 
   deploy_frontend_after_backend:
     runs-on: ubuntu-latest
     needs: deploy_backend
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+    - name: Checkout code
+      uses: actions/checkout@v2
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '18'
+    - name: Set up Node.js
+      uses: actions/setup-node@v2
+      with:
+        node-version: '18'
 
-      - name: Install frontend dependencies
-        run: |
-          cd frontend
-          npm install
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm install
 
-      - name: Build frontend
-        run: |
-          cd frontend
-          npm run build
+    - name: Build frontend
+      run: |
+        cd frontend
+        npm run build
+    
+    - name: Verify dist directory exists
+      run: |
+        if [ ! -d "frontend/dist" ]; then
+          echo "Error: Dist directory not found. Exiting."
+          exit 1
+        fi
 
-      - name: Verify dist directory exists
-        run: |
-          if [ ! -d "frontend/dist" ]; then
-            echo "Error: Dist directory not found. Exiting."
-            exit 1
-          fi
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-2
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-2
 
-      - name: Deploy frontend to S3
-        run: |
-          aws s3 sync frontend/dist/ s3://anunc-ia-frontend --delete
+    - name: Deploy frontend to S3
+      run: |
+        aws s3 sync frontend/dist/ s3://anunc-ia-frontend --delete
