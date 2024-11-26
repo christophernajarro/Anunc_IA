@@ -32,6 +32,9 @@ jobs:
         mkdir -p build
         python -m pip install --upgrade pip
         pip install --no-cache-dir -r requirements.txt -t build
+
+        pip unistall -y pycountry || true
+
         rsync -av --exclude='build' . build/
         cd build
         zip -r9 ../backend.zip .
