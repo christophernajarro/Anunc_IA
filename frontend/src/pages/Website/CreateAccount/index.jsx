@@ -7,6 +7,7 @@ import Container from "../../../layout/global/Container";
 import { Label, Input, Button } from "../../../components";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFacebookF, faGoogle } from "@fortawesome/free-brands-svg-icons";
+import axiosInstance from "../../../api/api"; // Importa axiosInstance
 
 function CreateAccountPage() {
     const [nombre, setNombre] = useState("");
@@ -29,27 +30,24 @@ function CreateAccountPage() {
         }
 
         try {
-            const response = await fetch("http://localhost:8000/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                credentials: "include",
-                body: JSON.stringify({ nombre, email, password }),
+            const response = await axiosInstance.post("/auth/register", {
+                nombre,
+                email,
+                password
+            }, {
+                withCredentials: true, // Asegura que se envíen cookies
             });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                setErrorMessage(errorData.detail || "Error en el registro");
-                return;
-            }
 
             setSuccessMessage("Registro exitoso. Redirigiendo al dashboard...");
 
             // Opcional: Iniciar sesión automáticamente después del registro
             await login(email, password);
         } catch (error) {
-            setErrorMessage("Error en el registro, por favor intente más tarde");
+            if (error.response) {
+                setErrorMessage(error.response.data.detail || "Error en el registro");
+            } else {
+                setErrorMessage("Error en el registro, por favor intente más tarde");
+            }
             console.error("Error:", error);
         }
     };

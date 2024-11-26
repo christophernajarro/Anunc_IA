@@ -1,4 +1,3 @@
-// src/context/AuthContext.jsx
 import React, { createContext, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../api/api"; // Asegúrate de que la ruta es correcta
@@ -15,7 +14,9 @@ export const AuthProvider = ({ children }) => {
     // Función para verificar la sesión
     const checkSession = async () => {
         try {
-            await axiosInstance.get("/auth/check_session");
+            await axiosInstance.get("/auth/check_session", {
+                withCredentials: true, // Asegura que se envíen cookies
+            });
             setIsAuthenticated(true);
         } catch (error) {
             console.error("Error al verificar la sesión:", error);
@@ -36,18 +37,14 @@ export const AuthProvider = ({ children }) => {
             const params = new URLSearchParams();
             params.append('username', email);
             params.append('password', password);
-            params.append('grant_type', 'password'); // Si es necesario
-            // Agrega otros parámetros si es necesario, como client_id y client_secret
+            // No necesitas agregar 'grant_type' a menos que lo requiera tu backend
 
             const response = await axiosInstance.post("/auth/login", params, {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
+                withCredentials: true, // Asegura que se envíen cookies
             });
-
-            // Si necesitas utilizar datos de la respuesta, hazlo aquí
-            // Por ejemplo:
-            // const { token } = response.data;
 
             setIsAuthenticated(true);
             navigate("/dashboard");
@@ -62,7 +59,9 @@ export const AuthProvider = ({ children }) => {
     // Función para cerrar sesión
     const logout = async () => {
         try {
-            await axiosInstance.post("/auth/logout");
+            await axiosInstance.post("/auth/logout", {}, {
+                withCredentials: true, // Asegura que se envíen cookies
+            });
             setIsAuthenticated(false);
             navigate("/login");
         } catch (error) {
