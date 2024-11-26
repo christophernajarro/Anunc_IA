@@ -72,7 +72,7 @@ async def register_usuario(
             key="session_id",
             value=session_id,
             httponly=False,
-            samesite="None",
+            samesite="Lax",
             secure=False,
             path="/",  # Cambiar a True en producción con HTTPS
             )
@@ -121,7 +121,7 @@ async def login(
         key="session_id",
         value=session_id,
         httponly=False,
-        samesite="None",
+        samesite="Lax",
         secure=False,
         path="/",  # Cambiar a True en producción con HTTPS
     )
