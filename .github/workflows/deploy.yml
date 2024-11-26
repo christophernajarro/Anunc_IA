@@ -25,6 +25,13 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-2
 
+    - name: Ensure S3 bucket exists
+      run: |
+        aws s3api create-bucket \
+          --bucket anunc-ia-lambda-packages \
+          --region us-east-2 \
+          --create-bucket-configuration LocationConstraint=us-east-2 || true
+
     - name: Install dependencies and package code
       working-directory: ./backend
       run: |
@@ -35,6 +42,15 @@ jobs:
         # Instalar dependencias en la carpeta de build
         python -m pip install --upgrade pip
         pip install --no-cache-dir -r requirements.txt -t build
+
+        # Copiar el código fuente al directorio de build
+        rsync -av \
+          --exclude='tests' \
+          --exclude='*.pyc' \
+          --exclude='__pycache__/' \
+          --exclude='*.log' \
+          --exclude='.git/' \
+          ./ build/
 
         # Eliminar archivos innecesarios
         find build -name '*.pyc' -delete
