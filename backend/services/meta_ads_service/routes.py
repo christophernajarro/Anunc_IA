@@ -31,7 +31,6 @@ import logging
 import os
 import traceback
 from dotenv import load_dotenv
-import requests
 import httpx
 
 # Cargar variables de entorno
@@ -57,10 +56,7 @@ if not all([ACCESS_TOKEN, APP_ID, APP_SECRET, AD_ACCOUNT_ID]):
 initialize_facebook_api(ACCESS_TOKEN)
 
 # Crear el router para meta_ads_service
-router = APIRouter(
-    prefix="/meta_ads",
-    tags=["Meta Ads"]
-)
+router = APIRouter()
 
 @router.post("/create_campaign", response_model=CampaignCreateResponse, summary="Crear una Campaña")
 def create_campaign(campaign_data: CampaignCreateRequest):
