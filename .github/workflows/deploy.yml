@@ -161,22 +161,17 @@ jobs:
             --function-name anunc-ia-backend \
             --zip-file fileb://backend.zip
 
-      - name: Associate main layer to Lambda function
+      - name: Wait before associating layers
         run: |
-          LAYER_MAIN_ARN=$(aws lambda list-layer-versions --layer-name anunc-ia-dependencies-main --query 'LayerVersions[-1].LayerVersionArn' --output text)
-          aws lambda update-function-configuration \
-            --function-name anunc-ia-backend \
-            --layers $LAYER_MAIN_ARN
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-2
+          echo "Waiting for 30 seconds to ensure layers are available..."
+          sleep 30
 
-      - name: Associate secondary layer to Lambda function with retries
+      - name: Associate both layers to Lambda function with retries
         run: |
           MAX_RETRIES=5
           RETRY_DELAY=10
           for i in $(seq 1 $MAX_RETRIES); do
+            LAYER_MAIN_ARN=$(aws lambda list-layer-versions --layer-name anunc-ia-dependencies-main --query 'LayerVersions[-1].LayerVersionArn' --output text)
             LAYER_SECONDARY_ARN=$(aws lambda list-layer-versions --layer-name anunc-ia-dependencies-secondary --query 'LayerVersions[-1].LayerVersionArn' --output text)
             if aws lambda update-function-configuration --function-name anunc-ia-backend --layers $LAYER_MAIN_ARN $LAYER_SECONDARY_ARN; then
               echo "Function configuration updated successfully."
