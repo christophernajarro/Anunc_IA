@@ -34,10 +34,12 @@ jobs:
         pip install --no-cache-dir -r requirements.txt -t build
 
         pip unistall -y pycountry || true
-
-        rsync -av --exclude='build' . build/
+        pip unistall -y ddtrace || true
+        
+        rsync -av --exclude='tests' --exclude='*.pyc' --exclude='__pycache__' --exclude='*.log' --exclude='.git' . build/
+        
         cd build
-        zip -r9 ../backend.zip .
+        zip -r9 ../backend.zip . -x "*.pyc" -x "__pycache__/*" -x "*.log"
         cd ..
         ZIP_SIZE=$(du -b backend.zip | cut -f1)
         echo "Backend package size: $ZIP_SIZE bytes"
