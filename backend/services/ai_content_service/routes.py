@@ -26,7 +26,7 @@ async def definir_campana_endpoint(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    print("Datos recibidos en /definir_campana:", data.dict())
+    print(f"Usuario ID: {current_user.id_usuario} | Datos recibidos en /definir_campana: {data.dict()}")
     return await manejar_definir_campana(data, current_user, db)
 
 @router.post("/definir_publico_ubicaciones", summary="Definir público objetivo y ubicaciones")
@@ -35,7 +35,7 @@ async def definir_publico_ubicaciones_endpoint(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    print("Datos recibidos en /definir_publico_ubicaciones:", data.dict())
+    print(f"Usuario ID: {current_user.id_usuario} | Datos recibidos en /definir_publico_ubicaciones: {data.dict()}")
     return await manejar_definir_publico_ubicaciones(data, current_user, db)
 
 @router.post("/elegir_formato_cta", summary="Elegir formato y CTA")
@@ -44,7 +44,7 @@ async def elegir_formato_cta_endpoint(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    print("Datos recibidos en /elegir_formato_cta:", data.dict())
+    print(f"Usuario ID: {current_user.id_usuario} | Datos recibidos en /elegir_formato_cta: {data.dict()}")
     return await manejar_elegir_formato_cta(data, current_user, db)
 
 @router.post("/crear_contenido_creativo", summary="Crear contenido creativo")
@@ -53,7 +53,7 @@ async def crear_contenido_creativo_endpoint(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    print("Datos recibidos en /crear_contenido_creativo:", data.dict())
+    print(f"Usuario ID: {current_user.id_usuario} | Datos recibidos en /crear_contenido_creativo: {data.dict()}")
     return await manejar_crear_contenido_creativo(data, current_user, db)
 
 @router.post("/create_heading", summary="Generar encabezados de anuncio")
@@ -62,5 +62,5 @@ async def create_heading_endpoint(
     current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    print("Datos recibidos en /create_heading:", encabezado.dict())
+    print(f"Usuario ID: {current_user.id_usuario} | Datos recibidos en /create_heading: {encabezado.dict()}")
     return await manejar_create_heading(encabezado, current_user, db)
