@@ -72,8 +72,8 @@ async def register_usuario(
             key="session_id",
             value=session_id,
             httponly=False,
-            samesite="Lax",
-            secure=False,
+            samesite="None",
+            secure=True,
             path="/",  # Cambiar a True en producción con HTTPS
             )
         logs.append("Cookie de sesión configurada en la respuesta")
@@ -121,8 +121,8 @@ async def login(
         key="session_id",
         value=session_id,
         httponly=False,
-        samesite="Lax",
-        secure=False,
+        samesite="None",
+        secure=True,
         path="/",  # Cambiar a True en producción con HTTPS
     )
     logs.append("Cookie de sesión configurada en la respuesta")
