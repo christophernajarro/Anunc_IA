@@ -8,6 +8,7 @@ from services.auth_service.routes import router as auth_router
 from services.user_service.routes import router as user_router
 from services.document_service.routes import router as document_router
 from services.product_service.routes import router as product_router
+from services.meta_ads_service.routes import router as meta_ads_router
 from dotenv import load_dotenv
 import os
 from mangum import Mangum  # Importar Mangum para Lambda
@@ -73,6 +74,7 @@ app.include_router(ai_content_router, prefix="/content", tags=["ai_content"])
 app.include_router(user_router, prefix="/users", tags=["users"])
 app.include_router(document_router, prefix="/documents", tags=["documents"])
 app.include_router(product_router, prefix="/productos", tags=["productos"])
+app.include_router(meta_ads_router, prefix="/meta_ads", tags=["meta_ads"])
 
 # Ruta raíz para verificar que la API está funcionando
 @app.get("/", response_class=JSONResponse)
