@@ -34,10 +34,18 @@ app = FastAPI(
     version="1.0.0"
 )
 
+origins = [
+    "http://localhost:8080",
+    "http://localhost:8000",
+    "https://anuncia.tech",
+    "https://kvpkimi65a3umrcqhbfnkqg2ma0yeare.lambda-url.us-east-2.on.aws",
+    # Añade otros orígenes si es necesario
+]
+
 # Configuración de CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080", "https://anuncia.tech","http://anuncia.tech"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

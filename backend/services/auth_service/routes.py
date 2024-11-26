@@ -71,7 +71,7 @@ async def register_usuario(
         response.set_cookie(
             key="session_id",
             value=session_id,
-            httponly=False,
+            httponly=True,
             samesite="None",
             secure=True,
             path="/",  # Cambiar a True en producción con HTTPS
@@ -120,7 +120,7 @@ async def login(
     response.set_cookie(
         key="session_id",
         value=session_id,
-        httponly=False,
+        httponly=True,
         samesite="None",
         secure=True,
         path="/",  # Cambiar a True en producción con HTTPS
