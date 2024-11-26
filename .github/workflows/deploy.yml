@@ -28,28 +28,32 @@ jobs:
     - name: Install dependencies and package code
       working-directory: ./backend
       run: |
+        # Limpiar y crear el directorio de build
         rm -rf build
         mkdir -p build
+
+        # Instalar dependencias en la carpeta de build
         python -m pip install --upgrade pip
         pip install --no-cache-dir -r requirements.txt -t build
 
-        pip unistall -y pycountry || true
-        pip unistall -y ddtrace || true
-        
-        rsync -av --exclude='tests' --exclude='*.pyc' --exclude='__pycache__' --exclude='*.log' --exclude='.git' . build/
-        
+        # Eliminar archivos innecesarios
+        find build -name '*.pyc' -delete
+        find build -name '__pycache__' -delete
+
+        # Crear el archivo ZIP
         cd build
-        zip -r9 ../backend.zip . -x "*.pyc" -x "__pycache__/*" -x "*.log"
+        zip -r9 ../backend.zip .
         cd ..
-        ZIP_SIZE=$(du -b backend.zip | cut -f1)
-        echo "Backend package size: $ZIP_SIZE bytes"
-        if [ $ZIP_SIZE -gt 52428800 ]; then
-          echo "Backend package size exceeds 50 MB limit."
-          exit 1
-        fi
+
+        # Subir el archivo ZIP al bucket de S3
+        aws s3 cp backend.zip s3://anunc-ia-lambda-packages/backend.zip
+
+    - name: Update Lambda function
+      run: |
         aws lambda update-function-code \
           --function-name anunc-ia-backend \
-          --zip-file fileb://backend.zip
+          --s3-bucket anunc-ia-lambda-packages \
+          --s3-key backend.zip
 
   deploy_frontend_after_backend:
     runs-on: ubuntu-latest
@@ -87,7 +91,6 @@ jobs:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: us-east-2
-
 
     - name: Deploy frontend to S3
       run: |
