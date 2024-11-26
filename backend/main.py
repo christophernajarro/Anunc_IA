@@ -34,11 +34,10 @@ app = FastAPI(
     version="1.0.0"
 )
 
-origins = ["https://anuncia.tech"]
+origins = ["http://localhost:8080"]
 
 # origins = [
 #     "http://localhost:8080",
-#     "http://localhost:8000",
 #     "https://anuncia.tech",
 #     # Añade otros orígenes si es necesario
 # ]
